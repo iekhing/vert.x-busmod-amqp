@@ -1,20 +1,17 @@
 package org.vertx.java.busmods.amqp;
-import com.rabbitmq.client.Envelope;
-import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.AMQP;
-
 import java.io.IOException;
-
-import java.util.Map;
-import java.util.HashMap;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.logging.Logger;
 
 import org.vertx.java.core.eventbus.EventBus;
 import org.vertx.java.core.eventbus.Message;
 import org.vertx.java.core.json.JsonObject;
 
-import java.util.logging.Logger;
-import java.util.logging.Level;
+import com.rabbitmq.client.AMQP;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Envelope;
 
 /**
  * Class for managing and dispatching RPC responses to their appropriate
@@ -89,7 +86,6 @@ public class RPCCallbackHandler extends MessageTransformingConsumer {
         throws IOException
     {
         super(channel, defaultContentType);
-
         queueName = channel.queueDeclare().getQueue();
         channel.basicConsume(queueName, this);
 

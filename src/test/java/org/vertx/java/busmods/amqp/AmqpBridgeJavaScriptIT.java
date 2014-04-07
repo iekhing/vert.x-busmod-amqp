@@ -1,22 +1,19 @@
 package org.vertx.java.busmods.amqp;
 
-import org.vertx.java.framework.TestBase;
-import org.vertx.java.framework.TestUtils;
+import java.io.IOException;
+import java.util.logging.Logger;
 
 import org.vertx.java.core.json.JsonObject;
+import org.vertx.java.testframework.TestBase;
+import org.vertx.java.testframework.TestUtils;
 
-import java.util.logging.Logger;
-import java.util.logging.Level;
-
+import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.Consumer;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
-import com.rabbitmq.client.AMQP;
-
-import java.io.IOException;
 
 public class AmqpBridgeJavaScriptIT extends TestBase {
     private final Logger logger = Logger.getLogger(getClass().getName());

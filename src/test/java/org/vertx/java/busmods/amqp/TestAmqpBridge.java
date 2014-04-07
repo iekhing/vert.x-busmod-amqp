@@ -1,32 +1,21 @@
 package org.vertx.java.busmods.amqp;
 
+import static org.easymock.EasyMock.createMock;
+import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.replay;
+import static org.easymock.EasyMock.verify;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
-import static org.easymock.EasyMock.createMock;
-import static org.easymock.EasyMock.expect;
-import static org.easymock.EasyMock.replay;
-import static org.easymock.EasyMock.verify;
-import static org.easymock.EasyMock.capture;
-import static org.easymock.EasyMock.eq;
-
-import org.easymock.Capture;
-
-import static org.junit.Assert.*;
-
 import org.vertx.java.core.Vertx;
-import org.vertx.java.core.Handler;
-import org.vertx.java.deploy.Container;
-
-import org.vertx.java.core.json.JsonObject;
-
 import org.vertx.java.core.eventbus.EventBus;
-
+import org.vertx.java.core.json.JsonObject;
 import org.vertx.java.core.logging.Logger;
 import org.vertx.java.core.logging.impl.LoggerFactory;
+import org.vertx.java.platform.Container;
 
 @RunWith(JUnit4.class)
 public class TestAmqpBridge {
@@ -55,10 +44,10 @@ public class TestAmqpBridge {
             .anyTimes();
 
         mockContainer = createMock(Container.class);
-        expect(mockContainer.getConfig())
+        expect(mockContainer.config())
             .andReturn(defaultJsonConfig);
 
-        expect(mockContainer.getLogger())
+        expect(mockContainer.logger())
             .andReturn(LoggerFactory.getLogger("mockContainer"))
             .anyTimes();
 
