@@ -5,10 +5,10 @@ import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
-import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.Map;
-import java.util.Queue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import org.vertx.java.busmods.BusModBase;
 import org.vertx.java.core.Handler;
@@ -32,9 +32,10 @@ import com.rabbitmq.client.Envelope;
  */
 public class AmqpBridge extends BusModBase {
    private Connection conn;
-   private Map<Long, Channel> consumerChannels = new HashMap<>();
+   private Map<Long, Channel> consumerChannels = new ConcurrentHashMap();
    private long consumerSeq;
-   private Queue<Channel> availableChannels = new LinkedList<>();
+   // private Queue<Channel> availableChannels = new Blockin<>();
+   private final BlockingQueue<Channel> availableChannels = new LinkedBlockingQueue<Channel>();
 
    private String callbackQueue;
    // private RPCCallbackHandler rpcCallbackHandler;
@@ -57,7 +58,6 @@ public class AmqpBridge extends BusModBase {
 
       try {
          factory.setUri(uri);
-
       } catch (URISyntaxException e) {
          throw new IllegalArgumentException("illegal uri: " + uri, e);
       } catch (NoSuchAlgorithmException e) {
@@ -67,6 +67,13 @@ public class AmqpBridge extends BusModBase {
       }
       try {
          conn = factory.newConnection(); // IOException
+         for (int i = 0; i <= 100; i++) {
+            Channel channel = conn.createChannel();
+            if (!availableChannels.add(channel)) {
+               channel.close();
+            }
+         }
+
 
       } catch (IOException e) {
          e.printStackTrace();
@@ -130,11 +137,24 @@ public class AmqpBridge extends BusModBase {
    // }}}
 
    // {{{ getChannel
-   private Channel getChannel() throws IOException {
-      if (!availableChannels.isEmpty()) {
-         return availableChannels.remove();
-      } else {
-         return conn.createChannel(); // IOException
+   private Channel getChannel() {
+      Channel channel = null;
+      try {
+
+         channel = availableChannels.take();
+         if (channel == null) {
+            channel = conn.createChannel();
+            if (!availableChannels.add(channel)) {
+               channel.close();
+            }
+            return availableChannels.take();
+         } else {
+            return channel;
+         }
+      } catch (InterruptedException e) {
+         throw new RuntimeException(e);
+      } catch (IOException e) {
+         throw new RuntimeException(e);
       }
    }
 
@@ -177,7 +197,7 @@ public class AmqpBridge extends BusModBase {
          amqpPropsBuilder.userId(ebProps.getString("userId"));
       }
       Channel channel = getChannel();
-      availableChannels.add(channel);
+      
       ContentType contentType = defaultContentType;
       try {
          contentType = ContentType.fromString(amqpPropsBuilder.build().getContentType());
@@ -219,8 +239,7 @@ public class AmqpBridge extends BusModBase {
                // exchange must default to non-null string
                message.getString("exchange", ""), message.getString("routingKey"),
                amqpPropsBuilder.build(), messageBodyBytes);
-
-
+      availableChannels.add(channel);
    }
 
    // }}}
@@ -234,9 +253,7 @@ public class AmqpBridge extends BusModBase {
          public void doHandle(final String consumerTag, final Envelope envelope,
                   final AMQP.BasicProperties properties, final JsonObject body) throws IOException {
             long deliveryTag = envelope.getDeliveryTag();
-
             eb.send(forwardAddress, body);
-
             getChannel().basicAck(deliveryTag, false);
          }
       };
@@ -275,7 +292,6 @@ public class AmqpBridge extends BusModBase {
 
       try {
          reply.putNumber("id", createConsumer(exchange, routingKey, forwardAddress));
-
          sendOK(message, reply);
       } catch (IOException e) {
          sendError(message, "unable to create consumer: " + e.getMessage(), e);
@@ -302,64 +318,4 @@ public class AmqpBridge extends BusModBase {
          sendError(message, "unable to send: " + e.getMessage(), e);
       }
    }
-
-   // }}}
-
-   // // {{{ handleInvokeRPC
-   // private void handleInvokeRPC(final Message<JsonObject> message) {
-   // // if replyTo is non-null, then this is a multiple-response RPC
-   // // invocation
-   // String replyTo = message.body().getString("replyTo");
-   //
-   // boolean isMultiResponse = (replyTo != null);
-   //
-   // // the correlationId is what ties this all together.
-   // String correlationId = UUID.randomUUID().toString();
-   //
-   // AMQP.BasicProperties.Builder amqpPropsBuilder = new
-   // AMQP.BasicProperties.Builder()
-   // .correlationId(correlationId).replyTo(
-   // rpcCallbackHandler.getQueueName());
-   //
-   // if (isMultiResponse) {
-   // // multiple-response invocation
-   //
-   // JsonObject msgProps = message.body().getObject("properties");
-   //
-   // String ebCorrelationId = null;
-   // Integer ttl = null;
-   //
-   // if (msgProps != null) {
-   // ebCorrelationId = msgProps.getString("correlationId");
-   // ttl = ((Integer) msgProps.getNumber("timeToLive", 0))
-   // .intValue();
-   //
-   // if (ttl == 0) {
-   // ttl = null;
-   // }
-   //
-   // // do not pass these on to send(); that could confuse things
-   // msgProps.removeField("correlationId");
-   // msgProps.removeField("timeToLive");
-   // }
-   //
-   // rpcCallbackHandler.addMultiResponseCorrelation(correlationId,
-   // ebCorrelationId, replyTo, ttl);
-   // } else {
-   // // standard call/response invocation; message.reply() will be called
-   // rpcCallbackHandler.addCorrelation(correlationId, message);
-   // }
-
-   // try {
-   // send(amqpPropsBuilder.build(), message.body());
-   //
-   // // always invoke message.reply to avoid ambiguity
-   // if (isMultiResponse) {
-   // sendOK(message);
-   // }
-   // } catch (IOException e) {
-   // sendError(message, "unable to publish: " + e.getMessage(), e);
-   // }
-   // }
-   // }}}
 }
